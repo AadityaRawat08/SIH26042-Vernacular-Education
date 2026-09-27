@@ -1,0 +1,174 @@
+# ============================================================================
+# Prototype Backend — main configuration.
+#
+# Sensitive values (database credentials, secrets) are NEVER hardcoded here.
+# They are injected from environment variables with safe local defaults.
+# See `.env.example` for the full list of supported variables.
+# ============================================================================
+spring:
+  application:
+    name: prototype-backend
+
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:local}
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/prototype}
+    username: ${DB_USERNAME:prototype}
+    password: ${DB_PASSWORD:prototype}
+    driver-class-name: ${DB_DRIVER:org.postgresql.Driver}
+    hikari:
+      pool-name: PrototypeHikariPool
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:10}
+      minimum-idle: ${DB_POOL_MIN_IDLE:2}
+      # 1  = fail fast if the database is unreachable at startup (default)
+      # -1 = skip the startup connectivity check (for resilience during local dev)
+      initialization-fail-timeout: ${DB_INIT_FAIL_TIMEOUT:1}
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: ${JPA_DDL_AUTO:none}
+    show-sql: ${JPA_SHOW_SQL:false}
+    properties:
+      hibernate:
+        format_sql: true
+        jdbc:
+          time_zone: UTC
+
+  servlet:
+    multipart:
+      # Parser-level caps: sized for the largest module upload limit (speech
+      # audio, 10MB). Module-specific limits (ocr.*, speech.*) are enforced in
+      # the services, so smaller modules still reject oversized files cleanly.
+      max-file-size: ${MULTIPART_MAX_FILE_SIZE:10MB}
+      max-request-size: ${MULTIPART_MAX_REQUEST_SIZE:12MB}
+
+  jackson:
+    default-property-inclusion: non_null
+    time-zone: UTC
+
+server:
+  port: ${SERVER_PORT:8080}
+  error:
+    # Let the GlobalExceptionHandler produce the error body, keep framework bodies minimal.
+    include-message: never
+    include-stacktrace: never
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      # never | when_authorized | always — tighten to "when_authorized" or "never" beyond local dev.
+      show-details: ${ACTUATOR_HEALTH_SHOW_DETAILS:always}
+      probes:
+        enabled: true
+  info:
+    env:
+      enabled: true
+
+info:
+  app:
+    name: ${APP_NAME:prototype-backend}
+    version: '@project.version@'
+    description: >-
+      AI-powered Vernacular Education and Real-Time Translation platform for
+      Indian languages and mother-tongue-based primary education.
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+  api-docs:
+    path: /v3/api-docs
+
+# ============================================================================
+# CORS (browser → API).
+#
+# Comma-separated list of origins allowed to call the API from a browser.
+# The default matches the frontend development server (see FrontEnd/vite.config.ts,
+# which pins port 5173) and can be overridden with CORS_ALLOWED_ORIGINS.
+# ============================================================================
+cors:
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
+
+# ============================================================================
+# JWT authentication.
+#
+# The signing secret is NEVER hardcoded for production: it must be supplied
+# through the JWT_SECRET environment variable (see `.env.example`). The default
+# below exists only so the service can boot in local development.
+# Generate a real secret with e.g.:  openssl rand -base64 64
+# ============================================================================
+jwt:
+  secret: ${JWT_SECRET:development-only-secret-change-me}
+  issuer: ${JWT_ISSUER:prototype-backend}
+  # Durations use Spring's simple format: 15m, 30m, 12h, 7d, or plain seconds.
+  access-token-ttl: ${JWT_ACCESS_TOKEN_TTL:15m}
+  refresh-token-ttl: ${JWT_REFRESH_TOKEN_TTL:7d}
+
+# ============================================================================
+# OCR upload settings.
+#
+# The application runs without any external OCR API or API key: the
+# development OcrProvider (MockOcrProvider) handles every upload locally.
+# These settings control accepted file types and the upload size limit.
+# ============================================================================
+ocr:
+  max-file-size: ${OCR_MAX_FILE_SIZE:5MB}
+  allowed-content-types:
+    - image/jpeg
+    - image/png
+    - image/webp
+
+# ============================================================================
+# Speech upload settings.
+#
+# The application runs without any external speech API or API key: the
+# development SpeechProvider (MockSpeechProvider) handles every request
+# locally. These settings control accepted audio types and the upload limit.
+# Set SPEECH_PROVIDER=http to route through the external voice services API.
+# ============================================================================
+speech:
+  max-file-size: ${SPEECH_MAX_FILE_SIZE:10MB}
+  allowed-content-types:
+    - audio/wav
+    - audio/x-wav
+    - audio/mpeg
+    - audio/mp4
+    - audio/ogg
+    - audio/webm
+  provider: ${SPEECH_PROVIDER:mock}
+
+# ============================================================================
+# External AI service integration (prototype wiring).
+#
+# The Spring Boot backend is the main API layer: the frontend never talks to
+# these Python services directly. Both services live on localhost during local
+# development; the backend must still START when they are unavailable.
+#
+# * translation.provider=mock  → MockTranslationProvider (default, no network)
+# * translation.provider=http  → HttpTranslationProvider → ai-translation
+# * speech.provider=mock       → MockSpeechProvider (default, no network)
+# * speech.provider=http       → HttpSpeechProvider → voice-service
+# ============================================================================
+translation:
+  provider: ${TRANSLATION_PROVIDER:mock}
+
+ai-translation:
+  base-url: ${AI_TRANSLATION_BASE_URL:http://localhost:8000}
+  timeout-seconds: ${AI_TRANSLATION_TIMEOUT_SECONDS:15}
+
+voice-service:
+  base-url: ${VOICE_SERVICE_BASE_URL:http://localhost:8001}
+  timeout-seconds: ${VOICE_SERVICE_TIMEOUT_SECONDS:15}
+
+logging:
+  level:
+    root: ${LOG_LEVEL_ROOT:INFO}
+    com.project: ${LOG_LEVEL_APP:DEBUG}
+    org.hibernate.SQL: ${LOG_LEVEL_SQL:WARN}
+  pattern:
+    console: '%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n'

@@ -1,0 +1,1 @@
+{"timestamp":"2026-09-07T18:19:49.405354600Z","status":400,"error":"Bad Request","message":"Malformed request body","path":"/api/auth/register"}

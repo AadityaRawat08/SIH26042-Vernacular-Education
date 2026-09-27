@@ -1,0 +1,56 @@
+# Test configuration: uses an in-memory PostgreSQL-compatible database so the
+# Spring context can load and tests can run without a live PostgreSQL instance.
+#
+# NOTE: on the test classpath this file SHADOWS src/main/resources/application.yml
+# (classpath lookup returns the first match), so every property the context needs,
+# e.g. `info.app.*`, must be declared here as well.
+spring:
+  datasource:
+    url: jdbc:h2:mem:prototype-test;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    username: sa
+    password: ''
+    driver-class-name: org.h2.Driver
+    hikari:
+      initialization-fail-timeout: -1
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+
+info:
+  app:
+    name: ${APP_NAME:prototype-backend}
+    version: 0.1.0-SNAPSHOT
+    description: Test configuration for prototype-backend
+
+# JWT properties required by the security beans in the test context.
+# The secret below is a THROWAWAY test value, never used in any environment.
+jwt:
+  secret: ${JWT_SECRET:unit-test-only-secret-key-not-valid-in-any-environment-0123456789}
+  issuer: ${JWT_ISSUER:prototype-backend-test}
+  access-token-ttl: 15m
+  refresh-token-ttl: 7d
+
+# OCR upload settings for tests: a 1MB cap makes the "oversized file" test
+# realistic without allocating large buffers.
+ocr:
+  max-file-size: 1MB
+  allowed-content-types:
+    - image/jpeg
+    - image/png
+    - image/webp
+
+# Speech upload settings for tests: a 1MB cap makes the "oversized file" test
+# realistic without allocating large buffers.
+speech:
+  max-file-size: 1MB
+  allowed-content-types:
+    - audio/wav
+    - audio/x-wav
+    - audio/mpeg
+    - audio/mp4
+    - audio/ogg
+    - audio/webm
+
+logging:
+  level:
+    com.project: INFO

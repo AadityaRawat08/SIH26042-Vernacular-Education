@@ -1,0 +1,1 @@
+CREATE POLICY "schools insert by member" ON public.schools FOR INSERT TO authenticated WITH CHECK (true);

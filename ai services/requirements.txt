@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+requests
+python-dotenv
+SpeechRecognition
+sounddevice
+scipy
+pyttsx3
+numpy

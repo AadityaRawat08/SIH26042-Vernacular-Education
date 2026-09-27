@@ -1,0 +1,25 @@
+# Local development infrastructure.
+# This ONLY provisions infrastructure (PostgreSQL). The application itself
+# remains a single modular-monolith deployment unit.
+name: prototype-backend
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: prototype-postgres
+    environment:
+      POSTGRES_DB: prototype
+      POSTGRES_USER: prototype
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-prototype}
+    ports:
+      - "5432:5432"
+    volumes:
+      - prototype-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U prototype -d prototype"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  prototype-pgdata:

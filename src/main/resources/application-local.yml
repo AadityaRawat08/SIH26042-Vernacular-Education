@@ -1,0 +1,20 @@
+# ============================================================================
+# Local development profile (activated by default via SPRING_PROFILES_ACTIVE=local).
+#
+# Enables Hibernate schema generation so Hibernate can create/update the
+# development database automatically. Override with the JPA_DDL_AUTO
+# environment variable. Production deployments MUST keep ddl-auto at
+# none/validate and manage the schema with real migrations.
+#
+# Uses H2 in PostgreSQL-compatibility mode for local development when no
+# PostgreSQL is available. Set SPRING_PROFILES_ACTIVE=prod to use PostgreSQL.
+# ============================================================================
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:h2:file:D:/Prototype/data/prototype;MODE=PostgreSQL;DB_CLOSE_DELAY=-1}
+    driver-class-name: ${SPRING_DATASOURCE_DRIVER:org.h2.Driver}
+    username: ${SPRING_DATASOURCE_USERNAME:sa}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
+  jpa:
+    hibernate:
+      ddl-auto: ${JPA_DDL_AUTO:update}
