@@ -1,205 +1,89 @@
-# Prototype Backend
+# AI-Powered Vernacular Pedagogy & Real-Time Translation
 
-Backend foundation for an **AI-powered Vernacular Education and Real-Time Translation
-platform** focused on Indian languages and mother-tongue-based primary education.
+### Smart India Hackathon 2026 — SIH26042
 
-Built as a **modular monolith**: one deployable application with clearly separated
-domain modules inside a single codebase. No microservices.
+**AI-Powered Vernacular Pedagogy and Real-Time Translation Tool for Mother Tongue-Based Primary Education**
 
-## Quick start — full local demo (recommended)
+A technology platform designed to help bridge the language gap between Hindi-medium teachers and students who learn more naturally through their regional or tribal mother tongue.
 
-One command starts the entire stack (AI translation :8000, voice service :8001,
-backend :8080, frontend :5173):
+The prototype combines **vernacular translation, speech processing, OCR, dictionary support, and educational learning resources** into a single platform.
 
-```powershell
-powershell -ExecutionPolicy Bypass -File D:\Prototype\start-all.ps1
-```
+---
 
-Then open **http://localhost:5173**. Stop everything with:
+## 🎯 Problem
 
-```powershell
-powershell -ExecutionPolicy Bypass -File D:\Prototype\stop-all.ps1
-```
+In many tribal and rural areas, teachers may not be proficient in the local language spoken by their students.
 
-Notes:
+For SIH26042, the target problem focuses on mother-tongue-based education in **Ho, Mundari, and Santhali**, where limited digital language resources create an additional technology barrier. The SIH problem statement calls for AI-assisted translation of Hindi FLN curriculum content, voice-to-voice interaction, and educational material generation. :chatgpt-content-reference{index="1"}
 
-* The backend runs in dev mode with an in-memory H2 database (no external
-  database needed) and uses the real HTTP providers
-  (`TRANSLATION_PROVIDER=http`, `SPEECH_PROVIDER=http`).
-* The AI translation service reads its Bhashini key from its own
-  `ai translation\member 4\.env` (`BHASHINI_INFERENCE_KEY`). If the key is a
-  placeholder, the service runs an **isolated, clearly-labelled demo fallback**
-  (`translation_ready: false`, `mode: demo-glossary`) — it never fakes a real
-  Bhashini result. Add a real key to that file to enable the live Bhashini path.
-* Runtime logs and PIDs are written to `D:\Prototype\.run\logs\`.
+This creates challenges such as:
 
+- Difficulty communicating between teachers and students
+- Limited educational content in local languages
+- Difficulty translating classroom material while preserving context
+- Limited speech-based interaction
+- Difficulty converting educational images/documents into usable text
+- Limited digital resources for low-resource Indian languages
 
-## Stack
+---
 
-| Concern      | Technology                              |
-|--------------|-----------------------------------------|
-| Language     | Java 21 (Temurin LTS)                   |
-| Framework    | Spring Boot 3.5                         |
-| Build        | Maven                                   |
-| Persistence  | PostgreSQL 16 (Spring Data JPA / Hibernate) |
-| Security     | Spring Security (stateless; JWT wired in the auth module later) |
-| Validation   | Jakarta Bean Validation (`spring-boot-starter-validation`) |
-| Docs         | OpenAPI 3 / Swagger UI (springdoc)      |
-| Observability| Spring Boot Actuator                    |
-| Boilerplate  | Lombok                                  |
+## 💡 Proposed Solution
 
-## Architecture
+Our platform provides a unified interface for teachers and students to interact with educational content through **text, speech, and image-based workflows**.
 
-```
-Controller  ──►  Service  ──►  Repository  ──►  PostgreSQL
-    │
-    └──► DTOs (never expose JPA entities over REST)
-```
+### Core capabilities
 
-* Controllers are thin HTTP adapters; business rules live in services.
-* DTOs are Java `record`s. JPA entities stay inside their module and are never
-  returned directly to clients.
-* External AI/translation providers will be accessed through small interfaces
-  (e.g. `TranslationProvider`) so implementations can be swapped.
+**Text → Text**
 
-## Current foundation (module scope)
+Translate educational content between supported languages.
 
-* Spring Boot application with Maven + Java 21
-* Spring Web, Data JPA, Security, Validation, Actuator, OpenAPI/Swagger, Lombok
-* `application.yml` — every credential configurable through environment variables
-  (see `.env.example`); nothing hardcoded
-* Standard API envelopes:
-  * success: `ApiResponse<T>` → `{ success, message, data, timestamp }`
-  * error: `ErrorResponse` → `{ timestamp, status, error, message, path, fieldErrors }`
-* `GlobalExceptionHandler` (`@RestControllerAdvice`) mapping validation failures
-  (400), not-found (404), business violations (422), malformed input, and unknown
-  errors (500) to the standard error body
-* Health endpoints:
-  * `GET /api/health` — lightweight liveness + service identity
-  * `GET /actuator/health` — full aggregated health (database, disk, …)
-* `user` module: `User` entity (`users` table, UUID PK, unique email/username,
-  role enum, created/updated timestamps), `UserRepository`, DTOs
-  (`UserResponse`, `CreateUserRequest`), and `UserService` — creation, lookups,
-  availability checks, duplicate-key business errors, and BCrypt password
-  hashing (no plaintext passwords, password excluded from all DTOs)
-* `auth` module: registration, login, JWT access tokens, rotating refresh
-  tokens, logout, and current-user lookup (see *Authentication endpoints*)
+**Speech → Text**
 
-#### Authentication endpoints
+Convert spoken input into text for further processing.
 
-| Method | Path                 | Auth   | Description |
-|--------|----------------------|--------|-------------|
-| POST   | `/api/auth/register` | public | Create account (role forced to `USER`) → safe `UserResponse` |
-| POST   | `/api/auth/login`    | public | `{ email, password }` → `{ accessToken, refreshToken, tokenType, expiresIn, user }` |
-| POST   | `/api/auth/refresh`  | public | `{ refreshToken }` → new token pair (old token revoked) |
-| POST   | `/api/auth/logout`   | Bearer | Revokes all of the caller's refresh tokens |
-| GET    | `/api/auth/me`       | Bearer | Safe profile of the authenticated user |
+**Text → Speech**
 
-Security model:
+Convert translated text into audio.
 
-* Stateless JWT (HS256) — claims: user id, username, role, `iss`/`iat`/`exp`.
-  TTL defaults to 15m (`JWT_ACCESS_TOKEN_TTL`).
-* Refresh tokens are opaque 256-bit values stored as SHA-256 hashes in the
-  `refresh_tokens` table, rotated on every refresh; reuse of a revoked token
-  revokes the user's entire token family (theft detection). TTL default 7d.
-* Passwords are BCrypt-hashed; never returned by any API and never logged.
-  Login failures always return one generic message (no account-existence leak).
-* Everything not listed as public requires a valid Bearer token — future
-  modules are protected by default. 401/403 use the standard error body.
-* Configuration: `JWT_SECRET` (≥ 32 chars, **required outside local dev**),
-  `JWT_ISSUER`, `JWT_ACCESS_TOKEN_TTL`, `JWT_REFRESH_TOKEN_TTL`.
-* PostgreSQL dev database via `compose.yaml`
-* H2 (PostgreSQL-compatible mode) for tests, so `./mvnw clean test` needs no live database
+**Speech → Speech**
 
-### Planned modules (built one at a time)
+Process spoken input, translate it, and generate speech output.
 
-`auth`, `user`, `language`, `translation`, `speech`, `ocr`, `document`,
-`dictionary`, `learning`, `resource`, `community`, `search`, `bookmark`,
-`history`, `notification`, `feedback`, `moderation`, `admin`, `analytics`
+**OCR → Translation**
 
-## Prerequisites
+Extract text from an educational image and send the extracted content through the translation workflow.
 
-* Java 21 (JDK)
-* Maven 3.9+
-* Docker (only for the local PostgreSQL dev database)
+**Language & Dictionary Support**
 
-## Quick start
+Provide language information and vocabulary assistance.
 
-```bash
-# 1. Start local PostgreSQL
-docker compose up -d
+**Learning & Educational Resources**
 
-# 2. (Optional) copy the example env file and adjust values
-copy .env.example .env
+Support language-aware learning content and educational resources.
 
-# 3. Run the application (env vars fall back to safe local defaults)
-./mvnw spring-boot:run
+---
 
-# 4. Verify
-curl http://localhost:8080/api/health
-curl http://localhost:8080/actuator/health
-```
+## 🌐 Target Use Case
 
-`mvnw` / `mvnw.cmd` is the Maven Wrapper — it downloads the exact Maven version
-(3.9.16) automatically, so no local Maven install is needed. A system `mvn` works
-equally well.
-
-## Useful endpoints
-
-| Endpoint                    | Description                          |
-|-----------------------------|--------------------------------------|
-| `GET /api/health`           | Application liveness check           |
-| `GET /actuator/health`      | Full health (DB, disk, …)            |
-| `GET /actuator/info`        | Metadata (version, description)      |
-| `GET /actuator/metrics`     | Runtime metrics                      |
-| `GET /swagger-ui.html`      | Swagger UI                           |
-| `GET /v3/api-docs`          | OpenAPI spec (JSON)                  |
-
-## Tests
-
-```bash
-./mvnw clean test
-```
-
-Tests run against an in-memory H2 database in PostgreSQL compatibility mode,
-so no database is required.
-
-## Environment variables
-
-| Variable                      | Default                                  | Purpose                          |
-|-------------------------------|------------------------------------------|----------------------------------|
-| `SPRING_PROFILES_ACTIVE`      | `local`                                  | Active Spring profile            |
-| `DB_URL`                      | `jdbc:postgresql://localhost:5432/prototype` | JDBC URL                   |
-| `DB_USERNAME`                 | `prototype`                              | Database user                    |
-| `DB_PASSWORD`                 | `prototype`                              | Database password (change in prod) |
-| `DB_POOL_MAX_SIZE` / `DB_POOL_MIN_IDLE` | `10` / `2`                    | Hikari pool sizing               |
-| `DB_INIT_FAIL_TIMEOUT`        | `1`                                      | Fail fast vs. skip startup DB check |
-| `JPA_DDL_AUTO`                | `none`                                   | Hibernate DDL strategy           |
-| `SERVER_PORT`                 | `8080`                                   | HTTP port                        |
-| `ACTUATOR_HEALTH_SHOW_DETAILS`| `always`                                 | Actuator health detail level     |
-| `LOG_LEVEL_ROOT` / `LOG_LEVEL_APP` | `INFO` / `DEBUG`                   | Logging levels                   |
-
-**Security note:** never put real credentials in committed files. Use environment
-variables (or a git-ignored `.env`) and keep local defaults weak.
-
-## Coding conventions
-
-* Java 21, records for DTOs, `@RestControllerAdvice` for errors.
-* One domain per top-level package under `com.project` (see package layout below).
-* Dependencies flow inward: `controller → service → repository`. Never the reverse.
-* Interfaces only where they earn their keep (external providers, persistence if
-  mocked at boundaries) — no speculative abstraction.
-* Write a test with every behavior change; keep `mvn clean test` green.
-
-### Package layout
-
-```
-com.project
-├── config/        # OpenAPI, and shared configuration
-├── security/      # Security filter chain (JWT arrives with the auth module)
-├── common/        # Shared DTOs (ApiResponse, ErrorResponse), exceptions, handler
-├── health/        # Health-check endpoint
-├── auth/          # (planned)
-├── user/          # (planned)
-└── … more modules planned (see list above)
-```
+```text
+Hindi-speaking Teacher
+        │
+        ▼
+   Teacher Input
+   Text / Voice / Image
+        │
+        ▼
+┌───────────────────────┐
+│   Vernacular Platform │
+└───────────┬───────────┘
+            │
+            ▼
+   Translation / Speech
+       / OCR Services
+            │
+            ▼
+   Tribal Language Output
+      Text / Audio
+            │
+            ▼
+     Student Interaction
